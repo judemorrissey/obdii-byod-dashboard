@@ -4,6 +4,7 @@ import { useState } from 'react'
 import {
   ChartContainer,
   ChartTooltip,
+  ChartTooltipContent,
 } from '@/components/ui/chart'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts'
 import type { ChartPoint } from '@/lib/queries/readings'
@@ -68,22 +69,13 @@ export default function PidChart({ pidName, unit, sessionId }: Props) {
                 />
                 <YAxis tick={{ fontSize: 11 }} width={60} />
                 <ChartTooltip
-                  content={({ active, payload, label }) => {
-                    if (!active || !payload?.length) return null
-                    return (
-                      <div className="grid min-w-32 items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                        <div className="font-medium">{`Time: ${formatTime(Number(label))}`}</div>
-                        <div className="flex justify-between gap-4">
-                          <span className="text-muted-foreground">{unit}</span>
-                          <span className="font-mono font-medium tabular-nums">
-                            {typeof payload[0]?.value === 'number'
-                              ? payload[0].value.toLocaleString()
-                              : payload[0]?.value}
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  }}
+                  content={
+                    <ChartTooltipContent
+                      labelFormatter={(_, payload) =>
+                        `Time: ${formatTime(Number(payload[0]?.payload?.offsetSeconds))}`
+                      }
+                    />
+                  }
                 />
                 <Line
                   type="monotone"
