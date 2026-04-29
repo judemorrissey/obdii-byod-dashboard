@@ -23,12 +23,21 @@ function valueToColor(value: number, min: number, max: number): string {
   return `rgb(${r},${g},${b})`
 }
 
+const SAMPLE_OPTIONS = [
+  { label: 'Full resolution', value: 1 },
+  { label: 'Every 2nd point', value: 2 },
+  { label: 'Every 5th point', value: 5 },
+  { label: 'Every 10th point', value: 10 },
+  { label: 'Every 25th point', value: 25 },
+]
+
 export default function MapView({ sessionId, pids }: Props) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<import('leaflet').Map | null>(null)
   const [route, setRoute] = useState<MapPoint[]>([])
   const [selectedPidId, setSelectedPidId] = useState<number | null>(null)
   const [pidValues, setPidValues] = useState<Map<number, number>>(new Map())
+  const [sampleRate, setSampleRate] = useState(5)
 
   useEffect(() => {
     fetch(`/api/gps-route?sessionId=${sessionId}`)
@@ -57,6 +66,8 @@ export default function MapView({ sessionId, pids }: Props) {
   useEffect(() => {
     if (!mapRef.current || route.length === 0) return
 
+    const sampled = route.filter((_, i) => i % sampleRate === 0)
+
     import('leaflet').then(leafletModule => {
       const L = leafletModule.default
 
@@ -73,21 +84,21 @@ export default function MapView({ sessionId, pids }: Props) {
         { subdomains: 'abcd', attribution: '© CartoDB' }
       ).addTo(map)
 
-      if (route.length >= 2) {
-        const values = route.map(p => pidValues.get(Math.round(p.offsetSeconds)) ?? 0)
+      if (sampled.length >= 2) {
+        const values = sampled.map(p => pidValues.get(Math.round(p.offsetSeconds)) ?? 0)
         const min = Math.min(...values)
         const max = Math.max(...values)
 
-        for (let i = 0; i < route.length - 1; i++) {
+        for (let i = 0; i < sampled.length - 1; i++) {
           const color = selectedPidId ? valueToColor(values[i], min, max) : '#3b82f6'
           L.polyline(
-            [[route[i].lat, route[i].lon], [route[i + 1].lat, route[i + 1].lon]],
+            [[sampled[i].lat, sampled[i].lon], [sampled[i + 1].lat, sampled[i + 1].lon]],
             { color, weight: 3, opacity: 0.85 }
           ).addTo(map)
         }
       }
 
-      const bounds = L.latLngBounds(route.map(p => [p.lat, p.lon] as [number, number]))
+      const bounds = L.latLngBounds(sampled.map(p => [p.lat, p.lon] as [number, number]))
       map.fitBounds(bounds, { padding: [40, 40] })
     })
 
@@ -95,24 +106,38 @@ export default function MapView({ sessionId, pids }: Props) {
       mapInstanceRef.current?.remove()
       mapInstanceRef.current = null
     }
-  }, [route, pidValues, selectedPidId])
+  }, [route, pidValues, selectedPidId, sampleRate])
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-3">
-        <label className="text-sm text-muted-foreground">Color route by:</label>
-        <select
-          className="text-sm bg-background border border-border rounded px-2 py-1"
-          value={selectedPidId ?? ''}
-          onChange={e => setSelectedPidId(e.target.value ? parseInt(e.target.value, 10) : null)}
-        >
-          <option value="">None (solid blue)</option>
-          {pids.map(p => (
-            <option key={p.pidId} value={p.pidId}>{p.pidName}</option>
-          ))}
-        </select>
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-muted-foreground">Color route by:</label>
+          <select
+            className="text-sm bg-background border border-border rounded px-2 py-1"
+            value={selectedPidId ?? ''}
+            onChange={e => setSelectedPidId(e.target.value ? parseInt(e.target.value, 10) : null)}
+          >
+            <option value="">None (solid blue)</option>
+            {pids.map(p => (
+              <option key={p.pidId} value={p.pidId}>{p.pidName}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-muted-foreground">Detail:</label>
+          <select
+            className="text-sm bg-background border border-border rounded px-2 py-1"
+            value={sampleRate}
+            onChange={e => setSampleRate(parseInt(e.target.value, 10))}
+          >
+            {SAMPLE_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
-      <div ref={mapRef} className="h-[500px] rounded-lg overflow-hidden" />
+      <div ref={mapRef} className="min-h-[60vh] h-[calc(100vh-280px)] rounded-lg overflow-hidden" />
     </div>
   )
 }
