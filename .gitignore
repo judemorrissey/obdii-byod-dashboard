@@ -46,3 +46,10 @@ data.db-shm
 data.db-wal
 csv_data/
 exported_records.zip
+
+# vscode
+.vscode
+
+# ai agents
+.superpowers
+docs/superpowers
